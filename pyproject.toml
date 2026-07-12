@@ -13,6 +13,8 @@ dependencies = [
 [tool.pyright]
 typeCheckingMode = "strict"
 pythonVersion = "3.14"
+venvPath = "."
+venv = ".venv"
 
 [dependency-groups]
 dev = [
