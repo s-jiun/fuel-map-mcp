@@ -8,8 +8,13 @@ fuel-map-mcp: 출발지-목적지 경로 찾기 및 주유소 검색 MCP 서버
 """
 
 import os
+
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
+from starlette.routing import Mount, Route
+
 from src.kakao_client import address_to_coords, get_directions
 from src.opinet_client import get_nearby_gas_stations
 from src.utils import filter_coordinates_by_interval
@@ -221,6 +226,21 @@ async def find_cheapest_gas_stations_on_route(
         "total_stations_found": len(all_stations),
     }
 
+
+# ── Health check endpoint (PlayMCP / Kakao Cloud LB) ──────────
+
+async def health(request):
+    return JSONResponse({"status": "ok", "name": "fuel-map-mcp", "version": "0.1.0"})
+
+
+# ── Starlette app: mount MCP + health ──────────────────────────
+
+app = Starlette(
+    routes=[
+        Route("/health", health, methods=["GET"]),
+        Mount("/", app=mcp.streamable_http_app),
+    ],
+)
 
 if __name__ == "__main__":
     transport = os.getenv("MCP_TRANSPORT", "stdio")

@@ -1,47 +1,14 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-*.egg-info/
-dist/
-build/
-.venv/
-venv/
-env/
-
-# 환경 설정
-.env.local
-.env.*.local
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Git
-.git/
+__pycache__
+.pytest_cache
+.venv
+.git
+.env
 .gitignore
-.gitattributes
-
-# 테스트
-.pytest_cache/
-htmlcov/
-.coverage
-.coverage.*
-
-# 문서
-*.md
-!README.md
-
-# Docker
-Dockerfile*
-docker-compose*.yml
 .dockerignore
-
-# 기타
-.DS_Store
 *.log
+.DS_Store
+README.md
+DEPLOY.md
+test_mcp.py
+kakao-mcp/
+.claude/

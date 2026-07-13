@@ -34,5 +34,5 @@ ENV MCP_PORT=8000
 # MCP 서버 포트 노출
 EXPOSE 8000
 
-# uvicorn을 직접 사용하여 FastMCP 앱 실행
-CMD [".venv/bin/uvicorn", "main:mcp.streamable_http_app", "--host", "0.0.0.0", "--port", "8000"]
+# uvicorn을 직접 사용하여 Starlette 앱 실행 (MCP + /health)
+CMD [".venv/bin/uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
