@@ -110,7 +110,26 @@ docker run -p 8000:8000 --env-file .env fuel-map-mcp
 - 출발지/목적지 좌표
 - 경로 좌표 목록
 
-### 2. find_cheapest_gas_stations_on_route
+### 2. find_cheapest_gas_stations_nearby
+
+특정 좌표 근처의 최저가 주유소 5곳을 찾습니다.
+
+**Parameters:**
+- `x` (float): 경도 (WGS84)
+- `y` (float): 위도 (WGS84)
+- `fuel_type` (str, optional): 유종 코드
+  - `B027`: 휘발유 (기본값)
+  - `D047`: 경유
+  - `K015`: 등유
+  - `C004`: LPG
+- `radius` (int, optional): 검색 반경 (미터, 최대 5000, 기본: 1000)
+
+**Returns:**
+- 검색 위치 좌표
+- 최저가 주유소 5곳 (이름, 브랜드, 가격, 거리, 좌표)
+- 발견된 총 주유소 수
+
+### 3. find_cheapest_gas_stations_on_route
 
 경로상의 최저가 주유소 5곳을 찾습니다.
 

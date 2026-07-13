@@ -3,6 +3,7 @@ fuel-map-mcp: 출발지-목적지 경로 찾기 및 주유소 검색 MCP 서버
 
 제공 도구:
   - get_route: 출발지/목적지 텍스트를 받아 Kakao Mobility로 경로를 반환합니다.
+  - find_cheapest_gas_stations_nearby: 특정 좌표 근처의 최저가 주유소를 찾습니다.
   - find_cheapest_gas_stations_on_route: 경로상의 최저가 주유소를 찾습니다.
 """
 
@@ -60,6 +61,65 @@ async def get_route(
         "origin_coords": origin_coords,
         "destination_coords": destination_coords,
         "route_vertexes": directions["route_vertexes"],
+    }
+
+
+@mcp.tool()
+async def find_cheapest_gas_stations_nearby(
+    x: float,
+    y: float,
+    fuel_type: str = "B027",
+    radius: int = 1000,
+) -> dict:
+    """
+    특정 좌표 근처의 최저가 주유소 5곳을 찾습니다.
+
+    Args:
+        x: 경도 (WGS84)
+        y: 위도 (WGS84)
+        fuel_type: 유종 코드 — B027: 휘발유(기본), D047: 경유, K015: 등유, C004: LPG
+        radius: 검색 반경 (미터, 최대 5000, 기본: 1000)
+
+    Returns:
+        location: 검색 위치 좌표
+        gas_stations: 최저가 주유소 5곳 [
+            {
+                "name": 주유소명,
+                "brand": 브랜드,
+                "price": 가격(원),
+                "distance": 검색 위치로부터 거리(m),
+                "x": 경도,
+                "y": 위도
+            },
+            ...
+        ]
+        total_found: 발견된 총 주유소 수
+    """
+    # 1) 주유소 검색
+    stations = await get_nearby_gas_stations(
+        x=x, y=y, radius=min(radius, 5000), fuel_type=fuel_type, sort=1
+    )
+
+    # 2) 가격 기준 정렬 (이미 sort=1로 정렬되지만 명시적으로)
+    stations.sort(key=lambda s: s["price"])
+
+    # 3) 최저가 5곳 선택
+    cheapest_stations = [
+        {
+            "name": station["name"],
+            "brand": station["brand"],
+            "price": station["price"],
+            "distance": station["distance"],
+            "x": station["x"],
+            "y": station["y"],
+        }
+        for station in stations[:5]
+    ]
+
+    return {
+        "location": {"x": x, "y": y},
+        "gas_stations": cheapest_stations,
+        "total_found": len(stations),
     }
 
 
