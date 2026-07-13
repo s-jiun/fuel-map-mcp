@@ -216,4 +216,7 @@ async def find_cheapest_gas_stations_on_route(
 
 
 if __name__ == "__main__":
-    mcp.run()
+    import os
+
+    transport = os.getenv("MCP_TRANSPORT", "stdio")
+    mcp.run(transport=transport)  # type: ignore

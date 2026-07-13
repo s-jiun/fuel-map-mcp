@@ -47,11 +47,11 @@ def filter_coordinates_by_interval(
     vertexes: list[float], interval_meters: float = 2000
 ) -> list[tuple[float, float]]:
     """
-    경로 좌표 목록에서 일정 간격으로 좌표를 샘플링합니다.
+    경로 좌표 목록에서 100개당 1개씩 샘플링합니다.
 
     Args:
         vertexes: [x1, y1, x2, y2, ...] 형식의 좌표 배열
-        interval_meters: 샘플링 간격 (미터)
+        interval_meters: 사용하지 않음 (하위 호환성을 위해 유지)
 
     Returns:
         [(x1, y1), (x2, y2), ...] 형식의 필터링된 좌표 목록
@@ -65,24 +65,15 @@ def filter_coordinates_by_interval(
     if not coords:
         return []
 
-    # 첫 번째 좌표는 항상 포함
+    # 100개당 1개씩 샘플링 (첫 번째와 마지막은 항상 포함)
     filtered = [coords[0]]
-    last_x, last_y = coords[0]
-    accumulated_distance = 0.0
 
-    for i in range(1, len(coords)):
-        curr_x, curr_y = coords[i]
-        distance = calculate_distance(last_x, last_y, curr_x, curr_y)
-        accumulated_distance += distance
-
-        # 누적 거리가 interval_meters 이상이면 현재 좌표 추가
-        if accumulated_distance >= interval_meters:
-            filtered.append((curr_x, curr_y))
-            last_x, last_y = curr_x, curr_y
-            accumulated_distance = 0.0
+    # 중간 좌표들을 100개 간격으로 샘플링
+    for i in range(100, len(coords) - 1, 100):
+        filtered.append(coords[i])
 
     # 마지막 좌표는 항상 포함 (이미 포함되어 있지 않다면)
-    if coords[-1] != filtered[-1]:
+    if len(coords) > 1 and coords[-1] != filtered[-1]:
         filtered.append(coords[-1])
 
     return filtered
