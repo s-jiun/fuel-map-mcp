@@ -15,7 +15,7 @@ RUN apt-get update && \
 
 # uv 패키지 매니저 설치
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.cargo/bin:${PATH}"
+ENV PATH="/root/.local/bin:${PATH}"
 
 # 프로젝트 파일 복사
 COPY pyproject.toml .
@@ -23,8 +23,8 @@ COPY src/ ./src/
 COPY main.py .
 
 # 의존성 설치
-RUN uv venv && \
-    uv pip install -e .
+RUN /root/.local/bin/uv venv && \
+    /root/.local/bin/uv pip install -e .
 
 # .env 파일은 런타임에 마운트하거나 환경변수로 전달
 # COPY .env .env
