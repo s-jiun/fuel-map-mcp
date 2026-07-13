@@ -27,8 +27,7 @@ RUN /root/.local/bin/uv venv && \
     /root/.local/bin/uv pip install -e .
 
 # 환경변수 기본값 설정 (플랫폼에서 override 가능)
-ENV MCP_TRANSPORT=streamable-http
-ENV MCP_HOST=0.0.0.0
+ENV MCP_TRANSPORT=http
 ENV MCP_PORT=8000
 
 # MCP 서버 포트 노출
