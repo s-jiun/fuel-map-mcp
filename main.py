@@ -1,12 +1,15 @@
 """
-fuel-map-mcp: 출발지-목적지 경로 찾기 MCP 서버
+fuel-map-mcp: 출발지-목적지 경로 찾기 및 주유소 검색 MCP 서버
 
 제공 도구:
   - get_route: 출발지/목적지 텍스트를 받아 Kakao Mobility로 경로를 반환합니다.
+  - find_cheapest_gas_stations_on_route: 경로상의 최저가 주유소를 찾습니다.
 """
 
 from mcp.server.fastmcp import FastMCP
-from kakao_client import address_to_coords, get_directions
+from src.kakao_client import address_to_coords, get_directions
+from src.opinet_client import get_nearby_gas_stations
+from src.utils import filter_coordinates_by_interval
 
 mcp = FastMCP("fuel-map-mcp")
 
@@ -57,6 +60,93 @@ async def get_route(
         "origin_coords": origin_coords,
         "destination_coords": destination_coords,
         "route_vertexes": directions["route_vertexes"],
+    }
+
+
+@mcp.tool()
+async def find_cheapest_gas_stations_on_route(
+    origin: str,
+    destination: str,
+    fuel_type: str = "B027",
+    priority: str = "RECOMMEND",
+) -> dict:
+    """
+    경로상의 최저가 주유소 5곳을 찾습니다.
+
+    경로를 2km 간격으로 샘플링하여 각 지점에서 1km 반경 내 주유소를 검색하고,
+    전체 중 최저가 주유소 5곳을 반환합니다.
+
+    Args:
+        origin: 출발지 주소 또는 장소명 (예: "강남역")
+        destination: 목적지 주소 또는 장소명 (예: "판교역")
+        fuel_type: 유종 코드 — B027: 휘발유(기본), D047: 경유, K015: 등유, C004: LPG
+        priority: 경로 우선순위 — RECOMMEND | TIME | DISTANCE (기본: RECOMMEND)
+
+    Returns:
+        route_info: 경로 정보 (distance_km, duration_min, 출발/도착지 좌표)
+        gas_stations: 최저가 주유소 5곳 [
+            {
+                "name": 주유소명,
+                "brand": 브랜드,
+                "price": 가격(원),
+                "distance_from_route_point": 경로 지점으로부터 거리(m),
+                "x": 경도,
+                "y": 위도
+            },
+            ...
+        ]
+        sampled_points_count: 샘플링된 경로 지점 수
+    """
+    # 1) 경로 조회
+    route = await get_route(origin, destination, priority)
+
+    # 2) 경로 좌표를 2km 간격으로 샘플링
+    route_vertexes = route["route_vertexes"]
+    sampled_coords = filter_coordinates_by_interval(route_vertexes, interval_meters=2000)
+
+    # 3) 각 샘플링된 좌표에서 1km 반경 내 주유소 검색
+    all_stations = []
+    station_ids = set()
+
+    for x, y in sampled_coords:
+        try:
+            stations = await get_nearby_gas_stations(
+                x=x, y=y, radius=1000, fuel_type=fuel_type, sort=1
+            )
+
+            # 중복 제거 (같은 주유소가 여러 지점에서 검색될 수 있음)
+            for station in stations:
+                station_id = station["station_id"]
+                if station_id not in station_ids:
+                    station_ids.add(station_id)
+                    all_stations.append(
+                        {
+                            "name": station["name"],
+                            "brand": station["brand"],
+                            "price": station["price"],
+                            "distance_from_route_point": station["distance"],
+                            "x": station["x"],
+                            "y": station["y"],
+                        }
+                    )
+        except Exception:
+            # 개별 지점 검색 실패 시 무시하고 계속 진행
+            continue
+
+    # 4) 가격 기준으로 정렬하여 최저가 5곳 선택
+    all_stations.sort(key=lambda s: s["price"])
+    cheapest_stations = all_stations[:5]
+
+    return {
+        "route_info": {
+            "distance_km": route["distance_km"],
+            "duration_min": route["duration_min"],
+            "origin": route["origin_coords"],
+            "destination": route["destination_coords"],
+        },
+        "gas_stations": cheapest_stations,
+        "sampled_points_count": len(sampled_coords),
+        "total_stations_found": len(all_stations),
     }
 
 

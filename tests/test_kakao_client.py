@@ -6,9 +6,8 @@ API 응답을 모킹하는 단위 테스트로 구성됩니다.
 """
 
 import pytest
-import pytest_asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
-from kakao_client import address_to_coords, get_directions
+from src.kakao_client import address_to_coords, get_directions
 
 
 # ---------------------------------------------------------------------------
