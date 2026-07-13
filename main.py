@@ -16,28 +16,38 @@ from src.utils import filter_coordinates_by_interval
 mcp = FastMCP("fuel-map-mcp")
 
 
-@mcp.tool()
+@mcp.tool(
+    annotations={
+        "title": "Get Route Information",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "openWorldHint": False,
+        "idempotentHint": True,
+    }
+)
 async def get_route(
     origin: str,
     destination: str,
     priority: str = "RECOMMEND",
 ) -> dict:
     """
-    출발지와 목적지를 입력받아 경로 정보를 반환합니다.
+    Retrieves route information between origin and destination using Fuel Map MCP(연료지도).
+
+    This tool queries Kakao Mobility API to get detailed route information including distance, duration, tolls, and route coordinates.
 
     Args:
-        origin: 출발지 주소 또는 장소명 (예: "강남역", "서울시 강남구 테헤란로 212")
-        destination: 목적지 주소 또는 장소명 (예: "판교역")
-        priority: 경로 우선순위 — RECOMMEND | TIME | DISTANCE (기본: RECOMMEND)
+        origin: Starting location address or place name (e.g., "Gangnam Station", "Seoul Gangnam-gu Teheran-ro 212")
+        destination: Destination address or place name (e.g., "Pangyo Station")
+        priority: Route priority - RECOMMEND | TIME | DISTANCE (default: RECOMMEND)
 
     Returns:
-        distance_km: 총 거리 (km, 소수점 1자리)
-        duration_min: 예상 소요시간 (분)
-        toll_fare: 통행료 (원)
-        taxi_fare: 택시 예상 요금 (원)
-        origin_coords: 출발지 좌표 {"x": float, "y": float, "name": str}
-        destination_coords: 목적지 좌표 {"x": float, "y": float, "name": str}
-        route_vertexes: 경로 좌표 목록 [x1, y1, x2, y2, ...] (WGS84)
+        distance_km: Total distance in kilometers (1 decimal place)
+        duration_min: Estimated travel time in minutes
+        toll_fare: Toll fees in KRW
+        taxi_fare: Estimated taxi fare in KRW
+        origin_coords: Origin coordinates {"x": float, "y": float, "name": str}
+        destination_coords: Destination coordinates {"x": float, "y": float, "name": str}
+        route_vertexes: Route coordinate list [x1, y1, x2, y2, ...] (WGS84)
     """
     # 1) 주소 → 좌표 변환
     origin_coords = await address_to_coords(origin)
@@ -65,34 +75,44 @@ async def get_route(
     }
 
 
-@mcp.tool()
+@mcp.tool(
+    annotations={
+        "title": "Find Cheapest Gas Stations Nearby",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "openWorldHint": False,
+        "idempotentHint": True,
+    }
+)
 async def find_cheapest_gas_stations_nearby(
     location: str,
     fuel_type: str = "B027",
     radius: int = 1000,
 ) -> dict:
     """
-    특정 위치 근처의 최저가 주유소 5곳을 찾습니다.
+    Finds the 5 cheapest gas stations near a specific location using Fuel Map MCP(연료지도).
+
+    This tool searches for gas stations within the specified radius using Opinet API and returns the top 5 cheapest options sorted by price.
 
     Args:
-        location: 위치 주소 또는 장소명 (예: "강남역", "서울시 강남구 테헤란로 212")
-        fuel_type: 유종 코드 — B027: 휘발유(기본), D047: 경유, K015: 등유, C004: LPG
-        radius: 검색 반경 (미터, 최대 5000, 기본: 1000)
+        location: Location address or place name (e.g., "Gangnam Station", "Seoul Gangnam-gu Teheran-ro 212")
+        fuel_type: Fuel type code - B027: Gasoline(default), D047: Diesel, K015: Kerosene, C004: LPG
+        radius: Search radius in meters (max 5000, default: 1000)
 
     Returns:
-        location: 검색 위치 정보 (이름, 좌표)
-        gas_stations: 최저가 주유소 5곳 [
+        location: Search location info (name, coordinates)
+        gas_stations: Top 5 cheapest gas stations [
             {
-                "name": 주유소명,
-                "brand": 브랜드,
-                "price": 가격(원),
-                "distance": 검색 위치로부터 거리(m),
-                "x": 경도,
-                "y": 위도
+                "name": Station name,
+                "brand": Brand name,
+                "price": Price in KRW,
+                "distance": Distance from search location in meters,
+                "x": Longitude,
+                "y": Latitude
             },
             ...
         ]
-        total_found: 발견된 총 주유소 수
+        total_found: Total number of gas stations found
     """
     # 1) 위치 문자열 → 좌표 변환
     location_coords = await address_to_coords(location)
@@ -129,7 +149,15 @@ async def find_cheapest_gas_stations_nearby(
     }
 
 
-@mcp.tool()
+@mcp.tool(
+    annotations={
+        "title": "Find Cheapest Gas Stations on Route",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "openWorldHint": False,
+        "idempotentHint": True,
+    }
+)
 async def find_cheapest_gas_stations_on_route(
     origin: str,
     destination: str,
@@ -137,31 +165,21 @@ async def find_cheapest_gas_stations_on_route(
     priority: str = "RECOMMEND",
 ) -> dict:
     """
-    경로상의 최저가 주유소 5곳을 찾습니다.
+    Finds the 5 cheapest gas stations along a route using Fuel Map MCP(연료지도).
 
-    경로를 2km 간격으로 샘플링하여 각 지점에서 1km 반경 내 주유소를 검색하고,
-    전체 중 최저가 주유소 5곳을 반환합니다.
+    Samples the route and searches for gas stations within 1km radius at each point, returning the top 5 cheapest options.
 
     Args:
-        origin: 출발지 주소 또는 장소명 (예: "강남역")
-        destination: 목적지 주소 또는 장소명 (예: "판교역")
-        fuel_type: 유종 코드 — B027: 휘발유(기본), D047: 경유, K015: 등유, C004: LPG
-        priority: 경로 우선순위 — RECOMMEND | TIME | DISTANCE (기본: RECOMMEND)
+        origin: Starting location (e.g., "Gangnam Station")
+        destination: Destination (e.g., "Pangyo Station")
+        fuel_type: B027(Gasoline), D047(Diesel), K015(Kerosene), C004(LPG)
+        priority: RECOMMEND | TIME | DISTANCE (default: RECOMMEND)
 
     Returns:
-        route_info: 경로 정보 (distance_km, duration_min, 출발/도착지 좌표)
-        gas_stations: 최저가 주유소 5곳 [
-            {
-                "name": 주유소명,
-                "brand": 브랜드,
-                "price": 가격(원),
-                "distance_from_route_point": 경로 지점으로부터 거리(m),
-                "x": 경도,
-                "y": 위도
-            },
-            ...
-        ]
-        sampled_points_count: 샘플링된 경로 지점 수
+        route_info: Route details (distance_km, duration_min, coordinates)
+        gas_stations: Top 5 cheapest stations with name, brand, price, distance, coordinates
+        sampled_points_count: Number of sampled points
+        total_stations_found: Total stations found
     """
     # 1) 경로 조회
     route = await get_route(origin, destination, priority)
