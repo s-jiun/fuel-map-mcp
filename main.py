@@ -31,7 +31,7 @@ async def get_route(
     priority: str = "RECOMMEND",
 ) -> dict:
     """
-    Retrieves route information between origin and destination using Fuel Map MCP(연료지도).
+    Retrieves route information between origin and destination using Fuel Map MCP(주유소 나침반).
 
     This tool queries Kakao Mobility API to get detailed route information including distance, duration, tolls, and route coordinates.
 
@@ -96,7 +96,7 @@ async def find_cheapest_gas_stations_nearby(
     radius: int = 1000,
 ) -> dict:
     """
-    Finds the 5 cheapest gas stations near a specific location using Fuel Map MCP(연료지도).
+    Finds the 5 cheapest gas stations near a specific location using Fuel Map MCP(주유소 나침반).
 
     This tool searches for gas stations within the specified radius using Opinet API and returns the top 5 cheapest options sorted by price.
 
@@ -165,7 +165,7 @@ async def find_cheapest_gas_stations_on_route(
     priority: str = "RECOMMEND",
 ) -> dict:
     """
-    Finds the 5 cheapest gas stations along a route using Fuel Map MCP(연료지도).
+    Finds the 5 cheapest gas stations along a route using Fuel Map MCP(주유소 나침반).
 
     Samples the route and searches for gas stations within 1km radius at each point, returning the top 5 cheapest options.
 
