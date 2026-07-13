@@ -66,22 +66,20 @@ async def get_route(
 
 @mcp.tool()
 async def find_cheapest_gas_stations_nearby(
-    x: float,
-    y: float,
+    location: str,
     fuel_type: str = "B027",
     radius: int = 1000,
 ) -> dict:
     """
-    특정 좌표 근처의 최저가 주유소 5곳을 찾습니다.
+    특정 위치 근처의 최저가 주유소 5곳을 찾습니다.
 
     Args:
-        x: 경도 (WGS84)
-        y: 위도 (WGS84)
+        location: 위치 주소 또는 장소명 (예: "강남역", "서울시 강남구 테헤란로 212")
         fuel_type: 유종 코드 — B027: 휘발유(기본), D047: 경유, K015: 등유, C004: LPG
         radius: 검색 반경 (미터, 최대 5000, 기본: 1000)
 
     Returns:
-        location: 검색 위치 좌표
+        location: 검색 위치 정보 (이름, 좌표)
         gas_stations: 최저가 주유소 5곳 [
             {
                 "name": 주유소명,
@@ -95,15 +93,22 @@ async def find_cheapest_gas_stations_nearby(
         ]
         total_found: 발견된 총 주유소 수
     """
-    # 1) 주유소 검색
+    # 1) 위치 문자열 → 좌표 변환
+    location_coords = await address_to_coords(location)
+
+    # 2) 주유소 검색
     stations = await get_nearby_gas_stations(
-        x=x, y=y, radius=min(radius, 5000), fuel_type=fuel_type, sort=1
+        x=location_coords["x"],
+        y=location_coords["y"],
+        radius=min(radius, 5000),
+        fuel_type=fuel_type,
+        sort=1,
     )
 
-    # 2) 가격 기준 정렬 (이미 sort=1로 정렬되지만 명시적으로)
+    # 3) 가격 기준 정렬 (이미 sort=1로 정렬되지만 명시적으로)
     stations.sort(key=lambda s: s["price"])
 
-    # 3) 최저가 5곳 선택
+    # 4) 최저가 5곳 선택
     cheapest_stations = [
         {
             "name": station["name"],
@@ -117,7 +122,7 @@ async def find_cheapest_gas_stations_nearby(
     ]
 
     return {
-        "location": {"x": x, "y": y},
+        "location": location_coords,
         "gas_stations": cheapest_stations,
         "total_found": len(stations),
     }
