@@ -45,9 +45,8 @@ async def get_route(
         duration_min: Estimated travel time in minutes
         toll_fare: Toll fees in KRW
         taxi_fare: Estimated taxi fare in KRW
-        origin_coords: Origin coordinates {"x": float, "y": float, "name": str}
-        destination_coords: Destination coordinates {"x": float, "y": float, "name": str}
-        route_vertexes: Route coordinate list [x1, y1, x2, y2, ...] (WGS84)
+        origin: Origin location name and coordinates
+        destination: Destination location name and coordinates
     """
     # 1) 주소 → 좌표 변환
     origin_coords = await address_to_coords(origin)
@@ -69,9 +68,16 @@ async def get_route(
         "duration_min": round(directions["duration"] / 60),
         "toll_fare": fare.get("toll", 0),
         "taxi_fare": fare.get("taxi", 0),
-        "origin_coords": origin_coords,
-        "destination_coords": destination_coords,
-        "route_vertexes": directions["route_vertexes"],
+        "origin": {
+            "name": origin_coords["name"],
+            "x": origin_coords["x"],
+            "y": origin_coords["y"],
+        },
+        "destination": {
+            "name": destination_coords["name"],
+            "x": destination_coords["x"],
+            "y": destination_coords["y"],
+        },
     }
 
 
@@ -100,19 +106,16 @@ async def find_cheapest_gas_stations_nearby(
         radius: Search radius in meters (max 5000, default: 1000)
 
     Returns:
-        location: Search location info (name, coordinates)
+        location: Search location name
         gas_stations: Top 5 cheapest gas stations [
             {
                 "name": Station name,
                 "brand": Brand name,
                 "price": Price in KRW,
-                "distance": Distance from search location in meters,
-                "x": Longitude,
-                "y": Latitude
+                "distance": Distance from location in meters
             },
             ...
         ]
-        total_found: Total number of gas stations found
     """
     # 1) 위치 문자열 → 좌표 변환
     location_coords = await address_to_coords(location)
@@ -126,26 +129,23 @@ async def find_cheapest_gas_stations_nearby(
         sort=1,
     )
 
-    # 3) 가격 기준 정렬 (이미 sort=1로 정렬되지만 명시적으로)
+    # 3) 가격 기준 정렬
     stations.sort(key=lambda s: s["price"])
 
-    # 4) 최저가 5곳 선택
+    # 4) 최저가 5곳 선택 (최소 데이터만 반환)
     cheapest_stations = [
         {
             "name": station["name"],
             "brand": station["brand"],
             "price": station["price"],
-            "distance": station["distance"],
-            "x": station["x"],
-            "y": station["y"],
+            "distance": round(station["distance"]),
         }
         for station in stations[:5]
     ]
 
     return {
-        "location": location_coords,
+        "location": location_coords["name"],
         "gas_stations": cheapest_stations,
-        "total_found": len(stations),
     }
 
 
@@ -176,46 +176,57 @@ async def find_cheapest_gas_stations_on_route(
         priority: RECOMMEND | TIME | DISTANCE (default: RECOMMEND)
 
     Returns:
-        route_info: Route details (distance_km, duration_min, coordinates)
-        gas_stations: Top 5 cheapest stations with name, brand, price, distance, coordinates
-        sampled_points_count: Number of sampled points
-        total_stations_found: Total stations found
+        route_info: Route details (distance_km, duration_min, origin/destination names)
+        gas_stations: Top 5 cheapest stations with name, brand, price, distance
     """
-    # 1) 경로 조회
-    route = await get_route(origin, destination, priority)
+    # 1) 주소 → 좌표 변환 및 경로 조회
+    origin_coords = await address_to_coords(origin)
+    destination_coords = await address_to_coords(destination)
 
-    # 2) 경로 좌표를 2km 간격으로 샘플링
-    route_vertexes = route["route_vertexes"]
+    directions = await get_directions(
+        origin_x=origin_coords["x"],
+        origin_y=origin_coords["y"],
+        destination_x=destination_coords["x"],
+        destination_y=destination_coords["y"],
+        priority=priority,
+    )
+
+    # 2) 경로 좌표를 샘플링
+    route_vertexes = directions["route_vertexes"]
     sampled_coords = filter_coordinates_by_interval(route_vertexes, interval_meters=2000)
 
-    # 3) 각 샘플링된 좌표에서 1km 반경 내 주유소 검색
+    # 3) 각 샘플링된 좌표에서 1km 반경 내 주유소 검색 (병렬 처리)
+    import asyncio
+
+    async def search_point(x: float, y: float) -> list:
+        try:
+            return await get_nearby_gas_stations(
+                x=x, y=y, radius=1000, fuel_type=fuel_type, sort=1
+            )
+        except Exception:
+            return []
+
+    # 병렬로 모든 지점 검색
+    search_tasks = [search_point(x, y) for x, y in sampled_coords]
+    search_results = await asyncio.gather(*search_tasks)
+
+    # 중복 제거 및 결과 집계
     all_stations = []
     station_ids = set()
 
-    for x, y in sampled_coords:
-        try:
-            stations = await get_nearby_gas_stations(
-                x=x, y=y, radius=1000, fuel_type=fuel_type, sort=1
-            )
-
-            # 중복 제거 (같은 주유소가 여러 지점에서 검색될 수 있음)
-            for station in stations:
-                station_id = station["station_id"]
-                if station_id not in station_ids:
-                    station_ids.add(station_id)
-                    all_stations.append(
-                        {
-                            "name": station["name"],
-                            "brand": station["brand"],
-                            "price": station["price"],
-                            "distance_from_route_point": station["distance"],
-                            "x": station["x"],
-                            "y": station["y"],
-                        }
-                    )
-        except Exception:
-            # 개별 지점 검색 실패 시 무시하고 계속 진행
-            continue
+    for stations in search_results:
+        for station in stations:
+            station_id = station["station_id"]
+            if station_id not in station_ids:
+                station_ids.add(station_id)
+                all_stations.append(
+                    {
+                        "name": station["name"],
+                        "brand": station["brand"],
+                        "price": station["price"],
+                        "distance": station["distance"],
+                    }
+                )
 
     # 4) 가격 기준으로 정렬하여 최저가 5곳 선택
     all_stations.sort(key=lambda s: s["price"])
@@ -223,14 +234,12 @@ async def find_cheapest_gas_stations_on_route(
 
     return {
         "route_info": {
-            "distance_km": route["distance_km"],
-            "duration_min": route["duration_min"],
-            "origin": route["origin_coords"],
-            "destination": route["destination_coords"],
+            "distance_km": round(directions["distance"] / 1000, 1),
+            "duration_min": round(directions["duration"] / 60),
+            "origin": origin_coords["name"],
+            "destination": destination_coords["name"],
         },
         "gas_stations": cheapest_stations,
-        "sampled_points_count": len(sampled_coords),
-        "total_stations_found": len(all_stations),
     }
 
 
