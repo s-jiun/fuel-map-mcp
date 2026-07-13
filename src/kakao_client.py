@@ -11,7 +11,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-KAKAO_REST_API_KEY = os.environ["KAKAO_REST_API_KEY"]
+KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY")
+if not KAKAO_REST_API_KEY:
+    raise ValueError(
+        "KAKAO_REST_API_KEY environment variable is required. "
+        "Please set it in your platform's environment variables."
+    )
 
 _LOCAL_BASE = "https://dapi.kakao.com/v2/local"
 _NAVI_BASE = "https://apis-navi.kakaomobility.com/v1"

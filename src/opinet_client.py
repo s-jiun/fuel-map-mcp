@@ -11,7 +11,12 @@ from src.utils import wgs84_to_katec, katec_to_wgs84
 
 load_dotenv()
 
-OPINET_API_KEY = os.environ["OPINET_API_KEY"]
+OPINET_API_KEY = os.getenv("OPINET_API_KEY")
+if not OPINET_API_KEY:
+    raise ValueError(
+        "OPINET_API_KEY environment variable is required. "
+        "Please set it in your platform's environment variables."
+    )
 
 _OPINET_BASE = "https://www.opinet.co.kr/api"
 

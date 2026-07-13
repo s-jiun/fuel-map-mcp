@@ -26,11 +26,13 @@ COPY main.py .
 RUN /root/.local/bin/uv venv && \
     /root/.local/bin/uv pip install -e .
 
-# .env 파일은 런타임에 마운트하거나 환경변수로 전달
-# COPY .env .env
+# 환경변수 기본값 설정 (플랫폼에서 override 가능)
+ENV MCP_TRANSPORT=streamable-http
+ENV MCP_HOST=0.0.0.0
+ENV MCP_PORT=8000
 
-# MCP 서버 포트 노출 (환경변수로 설정 가능)
+# MCP 서버 포트 노출
 EXPOSE 8000
 
-# 가상환경 활성화 및 MCP 서버 실행
-CMD [".venv/bin/python", "main.py"]
+# uvicorn을 직접 사용하여 FastMCP 앱 실행
+CMD [".venv/bin/uvicorn", "main:mcp.streamable_http_app", "--host", "0.0.0.0", "--port", "8000"]

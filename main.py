@@ -7,6 +7,7 @@ fuel-map-mcp: 출발지-목적지 경로 찾기 및 주유소 검색 MCP 서버
   - find_cheapest_gas_stations_on_route: 경로상의 최저가 주유소를 찾습니다.
 """
 
+import os
 from mcp.server.fastmcp import FastMCP
 from src.kakao_client import address_to_coords, get_directions
 from src.opinet_client import get_nearby_gas_stations
@@ -216,7 +217,5 @@ async def find_cheapest_gas_stations_on_route(
 
 
 if __name__ == "__main__":
-    import os
-
     transport = os.getenv("MCP_TRANSPORT", "stdio")
     mcp.run(transport=transport)  # type: ignore
